@@ -1,6 +1,6 @@
 import vec, * as v2 from "./vec2.js";
 import * as hex from "./hex.js";
-import SimplexNoise from "https://cdn.skypack.dev/simplex-noise@3.0.1";
+import map, { SIGHT_WORLD_SIZE, SIGHT_GRID_SIZE } from "./map.js";
 
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
@@ -37,25 +37,8 @@ const megaHex = n => [...Array(n)].reduce(
   acc => dedupHexGrids(acc.flatMap(hex.neighbors)),
   hex.neighbors(vec())
 );
-const SIGHT_GRID_SIZE = 20;
 const sightGrid = megaHex(SIGHT_GRID_SIZE-1)
   .sort((a, b) => (a.y + a.x*0.1) - (b.y + b.x*0.1));
-
-const biome = (() => {
-  const newNoise = () => SimplexNoise.prototype.noise2D.bind(new SimplexNoise());
-  const qP = newNoise();
-
-  return (x, y) => {
-    const s = 0.04;
-    const q = (qP(x*s, y*s) + 1)/2;
-
-    if (q < 0.29  ) return 'skyblue';
-    if (q < 0.38  ) return 'beige';
-    if (q < 0.5   ) return 'chartreuse';
-    if (q < 0.7   ) return 'green';
-    return 'darkgreen';
-  };
-})();
 
 requestAnimationFrame(function frame(now) {
   ctx.fillStyle = "white";
@@ -73,8 +56,8 @@ requestAnimationFrame(function frame(now) {
   player.vel = v2.add(player.vel, v2.mulf(v2.norm(mv), 2));
 
   cam = v2.lerp(cam, player.pos, 0.04);
+  map.garbageCollect(cam);
 
-  
   for (const ent of ents) {
     const { add, mulf } = v2;
 
@@ -84,13 +67,15 @@ requestAnimationFrame(function frame(now) {
 
 
   const ph = hex.offsetToAxial(player.pos);
+  const easeInOutSine = (x) => -(Math.cos(Math.PI * x) - 1) / 2;
   for (const oh of sightGrid) {
     const hexh = v2.add(oh, ph);
     const { x, y } = hex.axialToOffset(hexh);
 
-    ctx.globalAlpha = 1 - Math.min(1, v2.dist({x, y}, player.pos) /
-      v2.mag(hex.axialToOffset({ x: 0, y: SIGHT_GRID_SIZE })));
-    ctx.fillStyle = biome(hexh.x, hexh.y);
+    const a = v2.dist({x, y}, player.pos) / SIGHT_WORLD_SIZE;
+    ctx.globalAlpha = 0.9 * easeInOutSine(1 - Math.min(1, a));
+
+    ctx.fillStyle = map.at(hexh);
     drawHex(x, y, vec(hex.GRID_SIZE * 1.1));
   }
   ctx.globalAlpha = 1;
