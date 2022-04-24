@@ -37,7 +37,25 @@ const megaHex = n => [...Array(n)].reduce(
   acc => dedupHexGrids(acc.flatMap(hex.neighbors)),
   hex.neighbors(vec())
 );
-const sightGrid = megaHex(7);
+const SIGHT_GRID_SIZE = 20;
+const sightGrid = megaHex(SIGHT_GRID_SIZE-1)
+  .sort((a, b) => (a.y + a.x*0.1) - (b.y + b.x*0.1));
+
+const biome = (() => {
+  const newNoise = () => SimplexNoise.prototype.noise2D.bind(new SimplexNoise());
+  const qP = newNoise();
+
+  return (x, y) => {
+    const s = 0.04;
+    const q = (qP(x*s, y*s) + 1)/2;
+
+    if (q < 0.29  ) return 'skyblue';
+    if (q < 0.38  ) return 'beige';
+    if (q < 0.5   ) return 'chartreuse';
+    if (q < 0.7   ) return 'green';
+    return 'darkgreen';
+  };
+})();
 
 requestAnimationFrame(function frame(now) {
   ctx.fillStyle = "white";
@@ -54,7 +72,7 @@ requestAnimationFrame(function frame(now) {
   if (keys.has("d")) mv.x += 1;
   player.vel = v2.add(player.vel, v2.mulf(v2.norm(mv), 2));
 
-  cam = v2.lerp(cam, player.pos, 0.03);
+  cam = v2.lerp(cam, player.pos, 0.04);
 
   
   for (const ent of ents) {
@@ -65,25 +83,24 @@ requestAnimationFrame(function frame(now) {
   }
 
 
-  ctx.fillStyle = "black";
-
   const ph = hex.offsetToAxial(player.pos);
   for (const oh of sightGrid) {
-    const { x, y } = hex.axialToOffset(v2.add(oh, ph));
-    // console.log(x, y);
-    // ctx.fillRect(0, 0, hex.GRID_SIZE, hex.GRID_SIZE);
+    const hexh = v2.add(oh, ph);
+    const { x, y } = hex.axialToOffset(hexh);
 
     ctx.globalAlpha = 1 - Math.min(1, v2.dist({x, y}, player.pos) /
-      v2.mag(hex.axialToOffset({ x: 0, y: 8 })));
-    ctx.fillStyle = 'chartreuse';
-    drawHex(x, y, vec(hex.GRID_SIZE));
+      v2.mag(hex.axialToOffset({ x: 0, y: SIGHT_GRID_SIZE })));
+    ctx.fillStyle = biome(hexh.x, hexh.y);
+    drawHex(x, y, vec(hex.GRID_SIZE * 1.1));
   }
   ctx.globalAlpha = 1;
 
-  // for (const { pos: { x, y } } of ents) {
-  //   const w = 40*1.5, h = 50*1.5;
-  //   ctx.fillRect(x-w/2, y-h/2, w, h);
-  // }
+  ctx.fillStyle = "black";
+
+  for (const { pos: { x, y } } of ents) {
+    const w = 40*1.5, h = 50*1.5;
+    ctx.fillRect(x-w/2, y-h/2, w, h);
+  }
 
   ctx.restore();
   
