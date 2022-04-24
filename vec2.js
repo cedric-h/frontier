@@ -1,4 +1,8 @@
-export default ({ x=0, y=0 }={}) => ({ x, y });
+export default (x=0, y) => {
+  if (typeof x == "object")
+    ({ x, y } = x);
+  return { x, y: y ?? x };
+}
 
 export const mulf = ({ x, y }, f) => ({ x: x * f, y: y * f });
 export const divf = ({ x, y }, f) => ({ x: x / f, y: y / f });

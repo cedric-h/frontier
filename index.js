@@ -1,4 +1,5 @@
 import vec, * as v2 from "./vec2.js";
+import * as hex from "./hex.js";
 import SimplexNoise from "https://cdn.skypack.dev/simplex-noise@3.0.1";
 
 const canvas = document.querySelector("canvas");
@@ -18,6 +19,26 @@ window.onkeyup = ({ key }) => keys.delete(key);
 
 let cam = vec();
 
+const drawHex = (x, y, size, rot=0) => {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    let r = Math.PI * 2 * (i / 6) + Math.PI/2 + rot;
+    ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(r) * size.x,
+                                 y + Math.sin(r) * size.y);
+  }
+  ctx.fill();
+}
+
+const hexGridToSet = hg => new Set(hg.map(v2.toStr));
+const hexGridFromSet = set => [...set].map(v2.fromStr);
+const dedupHexGrids = hg => hexGridFromSet(hexGridToSet(hg));
+
+const megaHex = n => [...Array(n)].reduce(
+  acc => dedupHexGrids(acc.flatMap(hex.neighbors)),
+  hex.neighbors(vec())
+);
+const sightGrid = megaHex(7);
+
 requestAnimationFrame(function frame(now) {
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -34,6 +55,7 @@ requestAnimationFrame(function frame(now) {
   player.vel = v2.add(player.vel, v2.mulf(v2.norm(mv), 2));
 
   cam = v2.lerp(cam, player.pos, 0.03);
+
   
   for (const ent of ents) {
     const { add, mulf } = v2;
@@ -42,11 +64,26 @@ requestAnimationFrame(function frame(now) {
     ent.pos = add(ent.pos, ent.vel);
   }
 
+
   ctx.fillStyle = "black";
-  for (const { pos: { x, y } } of ents) {
-    const w = 40*1.5, h = 50*1.5;
-    ctx.fillRect(x-w/2, y-h/2, w, h);
+
+  const ph = hex.offsetToAxial(player.pos);
+  for (const oh of sightGrid) {
+    const { x, y } = hex.axialToOffset(v2.add(oh, ph));
+    // console.log(x, y);
+    // ctx.fillRect(0, 0, hex.GRID_SIZE, hex.GRID_SIZE);
+
+    ctx.globalAlpha = 1 - Math.min(1, v2.dist({x, y}, player.pos) /
+      v2.mag(hex.axialToOffset({ x: 0, y: 8 })));
+    ctx.fillStyle = 'chartreuse';
+    drawHex(x, y, vec(hex.GRID_SIZE));
   }
+  ctx.globalAlpha = 1;
+
+  // for (const { pos: { x, y } } of ents) {
+  //   const w = 40*1.5, h = 50*1.5;
+  //   ctx.fillRect(x-w/2, y-h/2, w, h);
+  // }
 
   ctx.restore();
   
