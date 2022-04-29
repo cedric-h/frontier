@@ -30,3 +30,10 @@ export const fromStr = str => {
 };
 
 export const fromRot = r => ({ x: Math.cos(r), y: Math.sin(r) });
+
+/* Returns a list of n vectors evenly distributed on a unit circle */
+export const circle = n =>
+  Array.from(
+    { length: n },
+    (_, i) => fromRot(i / n * Math.PI * 2),
+  );

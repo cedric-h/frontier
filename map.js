@@ -10,11 +10,11 @@ const biome = (() => {
     const s = 0.04;
     const q = (qP(x*s, y*s) + 1)/2;
 
-    if (q < 0.29  ) return 'skyblue';
-    if (q < 0.38  ) return 'beige';
-    if (q < 0.5   ) return 'greenyellow';
-    if (q < 0.7   ) return 'green';
-    return 'darkgreen';
+    if (q < 0.29  ) return [135, 206, 235];
+    if (q < 0.38  ) return [245, 245, 220];
+    if (q < 0.5   ) return [173, 255, 47];
+    if (q < 0.7   ) return [0, 128, 0];
+    return [0, 100, 0];
   };
 })();
 
@@ -24,6 +24,7 @@ export const SIGHT_WORLD_SIZE = v2.mag(hex.axialToOffset({ x: 0, y: SIGHT_GRID_S
 
 export default {
   cache: new Map(),
+  calcBiomeAt: biome,
   at(pos) {
     const { cache } = this;
     const k = v2.toStr(pos);

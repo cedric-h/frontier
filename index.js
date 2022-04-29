@@ -17,9 +17,11 @@ const keys = new Set();
 window.onkeydown = ({ key }) => keys.add(key);
 window.onkeyup = ({ key }) => keys.delete(key);
 
+const fmtColor = ([r, g, b]) => `rgb(${r}, ${g}, ${b})`;
+
 let cam = vec();
 
-const drawHex = (x, y, size, rot=0) => {
+const drawHex = (ctx, x, y, size, rot=0) => {
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
     let r = Math.PI * 2 * (i / 6) + Math.PI/2 + rot;
@@ -40,6 +42,48 @@ const megaHex = n => [...Array(n)].reduce(
 const sightGrid = megaHex(SIGHT_GRID_SIZE-1)
   .sort((a, b) => (a.y + a.x*0.1) - (b.y + b.x*0.1));
 
+const minimap = (() => {
+  const canvas = document.createElement("canvas");
+  const s = canvas.width = canvas.height = 300;
+  const ctx = canvas.getContext("2d");
+
+  drawHex(ctx, s/2, s/2, vec(0.9 * s/2), Math.PI/2);
+
+  const discovered = new Set();
+  return {
+    canvas,
+    ctx,
+
+    /* world pos -> minimap tile */
+    miniTile: p => hex.offsetToAxial(p, hex.GRID_SIZE*5),
+    /* minimap tile -> pixel on minimap */
+    miniTilePixel: hp => v2.add(vec(s/2), hex.axialToOffset(hp, 5)),
+    /* minimap tile -> world pixel */
+    miniTileWorld: hp => hex.axialToOffset(hp, hex.GRID_SIZE*5),
+
+    discover(p, map) {
+      for (const minihex of hex.neighbors(this.miniTile(p))) {
+        if (discovered.has(v2.toStr(minihex))) continue;
+        discovered.add(v2.toStr(minihex));
+
+        const { x, y } = this.miniTilePixel(minihex);
+        const world = this.miniTileWorld(minihex);
+
+        let [cr, cg, cb] = map.at(hex.offsetToAxial(world));
+        for (const p of v2.circle(10)) {
+          const [r, g, b] = map.at(hex.offsetToAxial(
+            v2.add(world, v2.mulf(p, hex.GRID_SIZE*5))));
+          cr += r;
+          cg += g;
+          cb += b;
+        }
+        ctx.fillStyle = fmtColor([cr / 11, cg / 11, cb / 11]);
+        drawHex(ctx, x, y, vec(5));
+      }
+    }
+  };
+})();
+
 requestAnimationFrame(function frame(now) {
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -57,6 +101,7 @@ requestAnimationFrame(function frame(now) {
 
   cam = v2.lerp(cam, player.pos, 0.04);
   map.garbageCollect(cam);
+  minimap.discover(player.pos, map);
 
   for (const ent of ents) {
     const { add, mulf } = v2;
@@ -75,8 +120,8 @@ requestAnimationFrame(function frame(now) {
     const a = v2.dist({x, y}, player.pos) / SIGHT_WORLD_SIZE;
     ctx.globalAlpha = 0.9 * easeInOutSine(1 - Math.min(1, a));
 
-    ctx.fillStyle = map.at(hexh);
-    drawHex(x, y, vec(hex.GRID_SIZE * 1.1));
+    ctx.fillStyle = fmtColor(map.at(hexh));
+    drawHex(ctx, x, y, vec(hex.GRID_SIZE * 1.1));
   }
   ctx.globalAlpha = 1;
 
@@ -88,6 +133,13 @@ requestAnimationFrame(function frame(now) {
   }
 
   ctx.restore();
+
+  const miniX = canvas.width - minimap.canvas.width
+  ctx.drawImage(minimap.canvas, miniX, 0);
+
+  const pmini = minimap.miniTilePixel(minimap.miniTile(player.pos));
+  ctx.fillStyle = "red";
+  drawHex(ctx, miniX + pmini.x, pmini.y, vec(3));
   
   requestAnimationFrame(frame);
 });
